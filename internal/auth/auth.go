@@ -2,8 +2,8 @@ package auth
 
 import (
 	"context"
-	"exchange/internal/db"
-	"exchange/internal/models"
+	"github.com/xtrntr/exchange/internal/db"
+	"github.com/xtrntr/exchange/internal/models"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"

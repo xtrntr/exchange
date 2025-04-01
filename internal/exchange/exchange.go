@@ -2,7 +2,7 @@ package exchange
 
 import (
 	"sort"
-	"exchange/internal/models"
+	"github.com/xtrntr/exchange/internal/models"
 )
 
 // Exchange manages the order book and matching engine
@@ -160,4 +160,23 @@ func min(a, b float64) float64 {
 		return a
 	}
 	return b
+}
+
+// RemoveOrder removes an order from the order book by ID
+func (e *Exchange) RemoveOrder(orderID int) bool {
+	// Try removing from buy orders
+	for i, order := range e.BuyOrders {
+		if order.ID == orderID {
+			e.BuyOrders = append(e.BuyOrders[:i], e.BuyOrders[i+1:]...)
+			return true
+		}
+	}
+	// Try removing from sell orders
+	for i, order := range e.SellOrders {
+		if order.ID == orderID {
+			e.SellOrders = append(e.SellOrders[:i], e.SellOrders[i+1:]...)
+			return true
+		}
+	}
+	return false
 } 

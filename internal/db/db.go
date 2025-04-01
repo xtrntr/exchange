@@ -2,7 +2,7 @@ package db
 
 import (
 	"context"
-	"exchange/internal/models"
+	"github.com/xtrntr/exchange/internal/models"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -128,4 +128,21 @@ func (db *DB) GetUserTrades(ctx context.Context, userID int) ([]models.Trade, er
 		trades = append(trades, trade)
 	}
 	return trades, nil
+}
+
+// CancelOrder cancels an order if it belongs to the user and is open
+func (db *DB) CancelOrder(ctx context.Context, orderID, userID int) error {
+	tag, err := db.Conn.Exec(ctx,
+		"UPDATE orders SET status = 'canceled' WHERE id = $1 AND user_id = $2 AND status = 'open'",
+		orderID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to cancel order: %w", err)
+	}
+	
+	// Check if any rows were affected using the CommandTag
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("order not found, not owned by user, or not open")
+	}
+	
+	return nil
 } 

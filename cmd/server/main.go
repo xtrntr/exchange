@@ -4,10 +4,10 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"exchange/internal/api"
-	"exchange/internal/auth"
-	"exchange/internal/db"
-	"exchange/internal/exchange"
+	"github.com/xtrntr/exchange/internal/api"
+	"github.com/xtrntr/exchange/internal/auth"
+	"github.com/xtrntr/exchange/internal/db"
+	"github.com/xtrntr/exchange/internal/exchange"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -45,6 +45,7 @@ func main() {
 		r.Use(handler.JWTAuthMiddleware)
 		r.Post("/orders", handler.PlaceOrder)
 		r.Get("/orders", handler.GetUserOrders)
+		r.Delete("/orders/{id}", handler.CancelOrder)
 		r.Get("/orderbook", handler.GetOrderBook)
 		r.Get("/trades", handler.GetUserTrades)
 	})

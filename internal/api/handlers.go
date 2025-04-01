@@ -3,11 +3,15 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"exchange/internal/auth"
-	"exchange/internal/db"
-	"exchange/internal/exchange"
-	"exchange/internal/models"
+	"log"
 	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/xtrntr/exchange/internal/auth"
+	"github.com/xtrntr/exchange/internal/db"
+	"github.com/xtrntr/exchange/internal/exchange"
+	"github.com/xtrntr/exchange/internal/models"
 )
 
 // Handler contains dependencies for HTTP handlers
@@ -209,4 +213,37 @@ func (h *Handler) GetUserTrades(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(trades)
+}
+
+// CancelOrder cancels an open order
+func (h *Handler) CancelOrder(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("user_id").(int)
+	if !ok {
+		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// Get order ID from URL
+	orderIDStr := chi.URLParam(r, "id")
+	orderID, err := strconv.Atoi(orderIDStr)
+	if err != nil {
+		http.Error(w, `{"error": "Invalid order ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Cancel order in database
+	err = h.DB.CancelOrder(r.Context(), orderID, userID)
+	if err != nil {
+		http.Error(w, `{"error": "Failed to cancel order: `+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Remove from order book
+	if !h.Exchange.RemoveOrder(orderID) {
+		// Log if order wasn't in book (non-fatal, as DB is source of truth)
+		log.Printf("Order %d not found in order book", orderID)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Order canceled"})
 } 
