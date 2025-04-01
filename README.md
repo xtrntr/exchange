@@ -9,18 +9,25 @@ A simple trading exchange built with Go and PostgreSQL for learning purposes. Th
 - **Order Book**: In-memory order book sorted by price-time priority
 - **Matching Engine**: Match orders based on price-time priority
 - **Trade History**: Record and query executed trades
+- **Real-time Updates**: WebSocket-based order book updates
+- **Interactive UI**: TradingView Lightweight Charts integration
 
 ## Prerequisites
 
 - Go 1.21+ (https://go.dev/dl/)
 - Docker and Docker Compose (https://docs.docker.com/get-docker/)
 - Git (https://git-scm.com/downloads)
+- Modern web browser with WebSocket support
 
 ## Project Structure
 
 ```
 exchange/
 ├── cmd/server/               # Application entry point
+├── frontend/                 # Web interface
+│   ├── index.html           # Main HTML with TradingView integration
+│   ├── styles.css           # Dark theme styling
+│   └── script.js            # Chart and WebSocket handling
 ├── internal/                 # Internal packages
 │   ├── api/                  # HTTP handlers
 │   ├── auth/                 # Authentication logic
@@ -60,7 +67,48 @@ exchange/
    go run cmd/server/main.go
    ```
 
+5. **Access the Web Interface**:
+   - Open `http://localhost:8080` in your browser
+   - Login with the test credentials:
+     ```
+     Username: testuser
+     Password: testpass
+     ```
+   - The interface includes:
+     - Real-time order book chart
+     - Order placement form
+     - Your orders list with cancel functionality
+
 The server will start at http://localhost:8080.
+
+## WebSocket API
+
+The application provides real-time order book updates via WebSocket:
+
+### Connection
+```javascript
+const ws = new WebSocket('ws://localhost:8080/ws');
+```
+
+### Message Format
+The server broadcasts order book updates every 5 seconds:
+```json
+{
+  "buy_orders": [
+    {"id": 1, "price": 50000.00, "quantity": 0.1, "type": "buy"}
+  ],
+  "sell_orders": [
+    {"id": 2, "price": 51000.00, "quantity": 0.05, "type": "sell"}
+  ]
+}
+```
+
+### Chart Integration
+The frontend uses TradingView Lightweight Charts to visualize the order book:
+- Candlestick chart showing current price action
+- Real-time updates from WebSocket data
+- Dark theme matching the UI
+- Responsive design
 
 ## Running Tests
 
@@ -145,12 +193,19 @@ The test suite covers:
 
 Test the API with curl:
 
+### Test Credentials
+For testing purposes, you can use these credentials:
+```
+Username: testuser
+Password: testpass
+```
+
 ### 1. Register a user
 
 ```bash
 curl -X POST http://localhost:8080/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"password123"}'
+  -d '{"username":"testuser","password":"testpass"}'
 ```
 
 ### 2. Login
@@ -158,7 +213,7 @@ curl -X POST http://localhost:8080/auth/register \
 ```bash
 curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"password123"}'
+  -d '{"username":"testuser","password":"testpass"}'
 ```
 
 Save the token from the response for subsequent requests.
