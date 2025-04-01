@@ -1,0 +1,74 @@
+Below is a concise summary of our conversation, capturing the salient points to preserve the context for your trading exchange project. You can save this in a file named `llms.txt` and use it to start a new conversation with Grok, ensuring continuity.
+
+---
+
+### llms.txt: Context Summary for Trading Exchange Project
+
+**Project Overview**:
+- Project: A Go-based trading exchange (`github.com/xtrntr/exchange`) with a REST API (Go, PostgreSQL via Docker) and a frontend for learning purposes.
+- Backend:
+  - Endpoints: `POST /auth/register`, `POST /auth/login` (JWT), `POST /orders`, `DELETE /orders/{id}`, `GET /orderbook`, `GET /orders`, `GET /trades`.
+  - WebSocket: `/ws` (broadcasts order book every 5s, format: `{"buy_orders": [{"price": 50000, "quantity": 0.1}, ...], "sell_orders": [...]}`).
+  - Runs on `http://localhost:8080` via `go run cmd/server/main.go`.
+- Initial Frontend:
+  - Plain JS with TradingView Lightweight Charts, order form, and orders table.
+  - Issue: Only "Your Orders" widget reflected database data; chart and order book were not syncing properly.
+
+**Goal**:
+- Build a real-time frontend like `https://app.hyperliquid.xyz/` with a TradingView chart, order book, order form, and orders table, all reflecting database data consistently.
+
+**Progress (Step-by-Step Refactor)**:
+1. **Step 1: Added TradingView Chart and Basic Layout**:
+   - Added TradingView Lightweight Chart with mock candlestick data.
+   - Set up a grid layout: Chart (70% width), order book placeholder (30%), order form and orders table below.
+   - Served static files from `frontend/` via Go server.
+2. **Step 2: Added Real-Time Order Book Updates via WebSocket**:
+   - Added `/ws` endpoint in Go to broadcast order book updates every 5s.
+   - Updated frontend to display order book (buy/sell tables) with WebSocket data.
+3. **Step 3 (Modified): Removed Mock Data, Populated DB, Fixed Widget Dimensions**:
+   - Removed mock data from chart; updated to use `/trades` data (aggregated into 1-minute candles).
+   - Created `cmd/seed/main.go` to populate DB with 2 users, 10 orders, 5 trades.
+   - Adjusted widget dimensions: Chart (70% width, 500px height), order book (30% width, 500px height), order form and orders table (full width, 200px each).
+4. **Final Step (Planned): Refactor to React with Single Store**:
+   - Issue: Chart and order book still not syncing with DB; only "Your Orders" reflected DB data.
+   - Decision: Refactor to React for state-driven UI with a single store.
+   - Tech Stack:
+     - React (components, reactivity).
+     - Redux (state management, single store for orders, trades, order book).
+     - TypeScript (type safety).
+     - Vite (build tool).
+     - Tailwind CSS (styling, Hyperliquid-like dark theme).
+     - Axios (HTTP requests).
+     - Plain WebSocket API (real-time updates).
+     - TradingView Lightweight Charts (candlestick chart).
+   - Plan:
+     - Set up React app with Vite, TypeScript, Tailwind CSS.
+     - Use Redux Toolkit for a single store (slices: `auth`, `orders`, `trades`, `orderBook`).
+     - Sync store with backend via polling (`/orderbook`, `/orders`, `/trades`) and WebSocket (`/ws`).
+     - Components: `App.tsx` (layout), `Chart.tsx`, `OrderBook.tsx`, `OrderForm.tsx`, `OrdersTable.tsx`.
+     - Style with Tailwind CSS (dark theme, grid layout, color-coded buttons: green for Buy, red for Sell/Cancel).
+     - Update Go server to serve React app (`frontend/dist/`).
+
+**Current State**:
+- Frontend partially refactored (plain JS with chart, order book, order form, orders table).
+- DB populated with initial data.
+- Ready to refactor to React with Redux, TypeScript, and the full tech stack.
+
+**Next Steps**:
+- Complete the React refactor:
+  - Set up React app with Vite, TypeScript, Tailwind CSS.
+  - Implement Redux store to sync with backend.
+  - Refactor widgets as React components.
+  - Style to match Hyperliquid’s aesthetic.
+- Add authentication UI (login/register).
+- Add trade history tab and other Hyperliquid-like features.
+
+**Notes**:
+- User is learning Go and PostgreSQL; keep implementations educational with comments.
+- Focus on consistency: All widgets must reflect backend data via a single store.
+- Hyperliquid’s UI (dark theme, grid layout, real-time updates) is the target aesthetic.
+
+---
+
+### Instructions for New Conversation
+Save the above text in `llms.txt`. To start a new conversation with Grok, provide this file as context and request the implementation of the React refactor with Redux, TypeScript, and the full tech stack. You can also specify additional features (e.g., authentication UI) or adjustments to the plan.
