@@ -26,6 +26,21 @@ func NewHandler(db *db.DB, ex *exchange.Exchange, authService *auth.AuthService)
 	return &Handler{DB: db, Exchange: ex, AuthService: authService}
 }
 
+// writeJSON writes a JSON response with consistent formatting
+func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if data != nil {
+		response, _ := json.Marshal(data)
+		w.Write(response)
+	}
+}
+
+// writeError writes a JSON error response with consistent formatting
+func writeError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, map[string]string{"error": message})
+}
+
 // Register handles user registration
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -33,23 +48,22 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error": "Invalid request body"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	if req.Username == "" || req.Password == "" {
-		http.Error(w, `{"error": "Username and password required"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Username and password required")
 		return
 	}
 
 	user, err := h.AuthService.Register(r.Context(), req.Username, req.Password)
 	if err != nil {
-		http.Error(w, `{"error": "Failed to register user"}`, http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "Failed to register user")
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"id":       user.ID,
 		"username": user.Username,
 	})
@@ -62,17 +76,17 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error": "Invalid request body"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	token, err := h.AuthService.Login(r.Context(), req.Username, req.Password)
 	if err != nil {
-		http.Error(w, `{"error": "Invalid credentials"}`, http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "Invalid credentials")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
+	writeJSON(w, http.StatusOK, map[string]string{"token": token})
 }
 
 // JWTAuthMiddleware verifies JWT tokens
@@ -80,7 +94,7 @@ func (h *Handler) JWTAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenString := r.Header.Get("Authorization")
 		if tokenString == "" {
-			http.Error(w, `{"error": "Authorization header required"}`, http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "Authorization header required")
 			return
 		}
 
@@ -91,7 +105,7 @@ func (h *Handler) JWTAuthMiddleware(next http.Handler) http.Handler {
 
 		userID, err := h.AuthService.GetUserFromToken(tokenString)
 		if err != nil {
-			http.Error(w, `{"error": "Invalid or expired token"}`, http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "Invalid or expired token")
 			return
 		}
 
@@ -105,7 +119,7 @@ func (h *Handler) JWTAuthMiddleware(next http.Handler) http.Handler {
 func (h *Handler) PlaceOrder(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("user_id").(int)
 	if !ok {
-		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
@@ -115,17 +129,17 @@ func (h *Handler) PlaceOrder(w http.ResponseWriter, r *http.Request) {
 		Quantity float64 `json:"quantity"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error": "Invalid request body"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	// Validate input
 	if req.Type != "buy" && req.Type != "sell" {
-		http.Error(w, `{"error": "Type must be 'buy' or 'sell'"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Type must be 'buy' or 'sell'")
 		return
 	}
 	if req.Price <= 0 || req.Quantity <= 0 {
-		http.Error(w, `{"error": "Price and quantity must be positive"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Price and quantity must be positive")
 		return
 	}
 
@@ -141,7 +155,7 @@ func (h *Handler) PlaceOrder(w http.ResponseWriter, r *http.Request) {
 	// Save order to database
 	dbOrder, err := h.DB.CreateOrder(r.Context(), &order)
 	if err != nil {
-		http.Error(w, `{"error": "Failed to create order"}`, http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "Failed to create order")
 		return
 	}
 
@@ -152,7 +166,7 @@ func (h *Handler) PlaceOrder(w http.ResponseWriter, r *http.Request) {
 	for _, trade := range trades {
 		_, err := h.DB.CreateTrade(r.Context(), &trade)
 		if err != nil {
-			http.Error(w, `{"error": "Failed to record trade"}`, http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "Failed to record trade")
 			return
 		}
 	}
@@ -160,14 +174,13 @@ func (h *Handler) PlaceOrder(w http.ResponseWriter, r *http.Request) {
 	// Update filled orders
 	for _, orderID := range filledOrderIDs {
 		if err := h.DB.UpdateOrderStatus(r.Context(), orderID, "filled"); err != nil {
-			http.Error(w, `{"error": "Failed to update order status"}`, http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "Failed to update order status")
 			return
 		}
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "Order placed",
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"message":  "Order placed",
 		"order_id": dbOrder.ID,
 	})
 }
@@ -176,23 +189,23 @@ func (h *Handler) PlaceOrder(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("user_id").(int)
 	if !ok {
-		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	orders, err := h.DB.GetUserOrders(r.Context(), userID)
 	if err != nil {
-		http.Error(w, `{"error": "Failed to retrieve orders"}`, http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "Failed to retrieve orders")
 		return
 	}
 
-	json.NewEncoder(w).Encode(orders)
+	writeJSON(w, http.StatusOK, orders)
 }
 
 // GetOrderBook retrieves the current order book
 func (h *Handler) GetOrderBook(w http.ResponseWriter, r *http.Request) {
 	buyOrders, sellOrders := h.Exchange.GetOrderBook()
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"buy_orders":  buyOrders,
 		"sell_orders": sellOrders,
 	})
@@ -202,24 +215,24 @@ func (h *Handler) GetOrderBook(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetUserTrades(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("user_id").(int)
 	if !ok {
-		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	trades, err := h.DB.GetUserTrades(r.Context(), userID)
 	if err != nil {
-		http.Error(w, `{"error": "Failed to retrieve trades"}`, http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "Failed to retrieve trades")
 		return
 	}
 
-	json.NewEncoder(w).Encode(trades)
+	writeJSON(w, http.StatusOK, trades)
 }
 
 // CancelOrder cancels an open order
 func (h *Handler) CancelOrder(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("user_id").(int)
 	if !ok {
-		http.Error(w, `{"error": "Unauthorized"}`, http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
@@ -227,14 +240,14 @@ func (h *Handler) CancelOrder(w http.ResponseWriter, r *http.Request) {
 	orderIDStr := chi.URLParam(r, "id")
 	orderID, err := strconv.Atoi(orderIDStr)
 	if err != nil {
-		http.Error(w, `{"error": "Invalid order ID"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Invalid order ID")
 		return
 	}
 
 	// Cancel order in database
 	err = h.DB.CancelOrder(r.Context(), orderID, userID)
 	if err != nil {
-		http.Error(w, `{"error": "Failed to cancel order: `+err.Error()+`"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Failed to cancel order: "+err.Error())
 		return
 	}
 
@@ -244,6 +257,5 @@ func (h *Handler) CancelOrder(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Order %d not found in order book", orderID)
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Order canceled"})
-} 
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Order canceled"})
+}

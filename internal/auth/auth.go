@@ -2,9 +2,11 @@ package auth
 
 import (
 	"context"
+	"fmt"
+	"time"
+
 	"github.com/xtrntr/exchange/internal/db"
 	"github.com/xtrntr/exchange/internal/models"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -22,6 +24,20 @@ func NewAuthService(db *db.DB) *AuthService {
 
 // Register creates a new user with hashed password
 func (s *AuthService) Register(ctx context.Context, username, password string) (*models.User, error) {
+	// Validate input
+	if username == "" {
+		return nil, fmt.Errorf("username cannot be empty")
+	}
+	if password == "" {
+		return nil, fmt.Errorf("password cannot be empty")
+	}
+	if len(username) > 50 {
+		return nil, fmt.Errorf("username too long (max 50 characters)")
+	}
+	if len(password) > 100 {
+		return nil, fmt.Errorf("password too long (max 100 characters)")
+	}
+
 	// Hash the password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -31,7 +47,7 @@ func (s *AuthService) Register(ctx context.Context, username, password string) (
 	// Create user in database
 	user, err := s.DB.CreateUser(ctx, username, string(hashedPassword))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 	return user, nil
 }
@@ -81,4 +97,4 @@ func (s *AuthService) GetUserFromToken(tokenString string) (int, error) {
 		return int(userID), nil
 	}
 	return 0, err
-} 
+}

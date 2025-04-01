@@ -36,7 +36,7 @@ exchange/
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/exchange.git
+   git clone https://github.com/xtrntr/exchange.git
    cd exchange
    ```
 
@@ -61,6 +61,85 @@ exchange/
    ```
 
 The server will start at http://localhost:8080.
+
+## Running Tests
+
+The project includes comprehensive integration tests that verify functionality using a real PostgreSQL database.
+
+### Prerequisites
+
+1. **PostgreSQL Running**: Ensure the PostgreSQL container is running:
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Install gotestsum** (optional, for enhanced test output):
+   ```bash
+   go install gotest.tools/gotestsum@latest
+   ```
+
+### Running Tests
+
+1. **Run all tests with gotestsum**:
+   ```bash
+   gotestsum --format testname
+   ```
+
+2. **Run all tests with standard Go test**:
+   ```bash
+   go test ./...
+   ```
+
+3. **Run tests for specific packages**:
+   ```bash
+   go test ./internal/auth
+   go test ./internal/db
+   go test ./internal/exchange
+   go test ./internal/api
+   ```
+
+4. **Run tests with coverage**:
+   ```bash
+   go test -coverprofile=coverage.out ./...
+   go tool cover -html=coverage.out  # View coverage in browser
+   ```
+
+### Test Cases
+
+The test suite covers:
+
+1. **Authentication (`auth_test.go`)**:
+   - User registration with password hashing
+   - Login with JWT generation
+   - Token validation and expiration
+   - Edge cases (duplicate users, invalid credentials)
+
+2. **Database Operations (`db_test.go`)**:
+   - Order creation and validation
+   - Order cancellation (including concurrent cancellations)
+   - User order retrieval
+   - Trade recording
+
+3. **Exchange Logic (`exchange_test.go`)**:
+   - Order book management
+   - Price-time priority ordering
+   - Order matching and execution
+   - Partial fills and order removal
+
+4. **HTTP Handlers (`handlers_test.go`)**:
+   - Order placement and validation
+   - Order cancellation
+   - Order book viewing
+   - Authentication middleware
+   - Error handling
+
+### Notes
+
+- Tests require a running PostgreSQL instance (via Docker)
+- Database is reset between test runs for isolation
+- JWT secret is hardcoded for testing
+- Some tests verify concurrent operations
+- Each test file includes its own TestMain for setup
 
 ## API Usage
 
