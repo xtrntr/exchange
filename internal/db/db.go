@@ -196,3 +196,40 @@ func (db *DB) CancelOrder(ctx context.Context, orderID, userID int) error {
 
 	return nil
 }
+
+// GetOpenOrders retrieves all open orders from the database
+func (db *DB) GetOpenOrders(ctx context.Context) ([]models.Order, error) {
+	rows, err := db.Pool.Query(ctx, `
+		SELECT id, user_id, type, price, quantity, status, created_at
+		FROM orders
+		WHERE status = 'open'
+		ORDER BY created_at ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []models.Order
+	for rows.Next() {
+		var order models.Order
+		err := rows.Scan(
+			&order.ID,
+			&order.UserID,
+			&order.Type,
+			&order.Price,
+			&order.Quantity,
+			&order.Status,
+			&order.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}

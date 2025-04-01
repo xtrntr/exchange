@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -204,7 +205,38 @@ func (h *Handler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 
 // GetOrderBook retrieves the current order book
 func (h *Handler) GetOrderBook(w http.ResponseWriter, r *http.Request) {
-	buyOrders, sellOrders := h.Exchange.GetOrderBook()
+	// Get open orders directly from database
+	orders, err := h.DB.GetOpenOrders(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to retrieve order book")
+		return
+	}
+
+	// Separate into buy and sell orders
+	var buyOrders, sellOrders []models.Order
+	for _, order := range orders {
+		if order.Type == "buy" {
+			buyOrders = append(buyOrders, order)
+		} else {
+			sellOrders = append(sellOrders, order)
+		}
+	}
+
+	// Sort orders appropriately
+	sort.Slice(buyOrders, func(i, j int) bool {
+		if buyOrders[i].Price == buyOrders[j].Price {
+			return buyOrders[i].CreatedAt.Before(buyOrders[j].CreatedAt)
+		}
+		return buyOrders[i].Price > buyOrders[j].Price
+	})
+
+	sort.Slice(sellOrders, func(i, j int) bool {
+		if sellOrders[i].Price == sellOrders[j].Price {
+			return sellOrders[i].CreatedAt.Before(sellOrders[j].CreatedAt)
+		}
+		return sellOrders[i].Price < sellOrders[j].Price
+	})
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"buy_orders":  buyOrders,
 		"sell_orders": sellOrders,

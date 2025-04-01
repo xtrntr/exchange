@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -35,8 +36,40 @@ var (
 	clientsMu sync.RWMutex
 )
 
-func broadcastOrderBook(ex *exchange.Exchange) {
-	buyOrders, sellOrders := ex.GetOrderBook()
+func broadcastOrderBook(ex *exchange.Exchange, database *db.DB) {
+	// Get open orders directly from database
+	ctx := context.Background()
+	openOrders, err := database.GetOpenOrders(ctx)
+	if err != nil {
+		log.Printf("Failed to get open orders from database: %v", err)
+		return
+	}
+
+	// Separate into buy and sell orders
+	var buyOrders, sellOrders []models.Order
+	for _, order := range openOrders {
+		if order.Type == "buy" {
+			buyOrders = append(buyOrders, order)
+		} else {
+			sellOrders = append(sellOrders, order)
+		}
+	}
+
+	// Sort orders appropriately
+	sort.Slice(buyOrders, func(i, j int) bool {
+		if buyOrders[i].Price == buyOrders[j].Price {
+			return buyOrders[i].CreatedAt.Before(buyOrders[j].CreatedAt)
+		}
+		return buyOrders[i].Price > buyOrders[j].Price
+	})
+
+	sort.Slice(sellOrders, func(i, j int) bool {
+		if sellOrders[i].Price == sellOrders[j].Price {
+			return sellOrders[i].CreatedAt.Before(sellOrders[j].CreatedAt)
+		}
+		return sellOrders[i].Price < sellOrders[j].Price
+	})
+
 	orderBook := struct {
 		BuyOrders  []models.Order `json:"buy_orders"`
 		SellOrders []models.Order `json:"sell_orders"`
@@ -44,6 +77,7 @@ func broadcastOrderBook(ex *exchange.Exchange) {
 		BuyOrders:  buyOrders,
 		SellOrders: sellOrders,
 	}
+
 	data, err := json.Marshal(orderBook)
 	if err != nil {
 		log.Printf("Failed to marshal order book: %v", err)
@@ -67,7 +101,7 @@ func broadcastOrderBook(ex *exchange.Exchange) {
 	clientsMu.RUnlock()
 }
 
-func handleWebSocket(ex *exchange.Exchange) http.HandlerFunc {
+func handleWebSocket(ex *exchange.Exchange, database *db.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -80,8 +114,8 @@ func handleWebSocket(ex *exchange.Exchange) http.HandlerFunc {
 		clients[client] = true
 		clientsMu.Unlock()
 
-		// Send initial order book
-		broadcastOrderBook(ex)
+		// Send initial order book from database
+		broadcastOrderBook(ex, database)
 
 		// Keep connection alive and handle disconnection
 		for {
@@ -111,6 +145,17 @@ func main() {
 	// Initialize exchange (order book and matching engine)
 	ex := exchange.NewExchange()
 
+	// Load open orders into exchange
+	openOrders, err := database.GetOpenOrders(ctx)
+	if err != nil {
+		log.Printf("Failed to load open orders: %v", err)
+	} else {
+		for _, order := range openOrders {
+			ex.AddOrder(order)
+		}
+		log.Printf("Loaded %d open orders into exchange", len(openOrders))
+	}
+
 	// Initialize auth service
 	authService := auth.NewAuthService(database)
 
@@ -134,7 +179,7 @@ func main() {
 	r.Handle("/*", http.FileServer(http.Dir("frontend")))
 
 	// WebSocket endpoint
-	r.Get("/ws", handleWebSocket(ex))
+	r.Get("/ws", handleWebSocket(ex, database))
 
 	// Public endpoints
 	r.Post("/auth/register", handler.Register)
@@ -150,11 +195,11 @@ func main() {
 		r.Get("/trades", handler.GetUserTrades)
 	})
 
-	// Start periodic order book broadcast
+	// Start periodic order book broadcast using database as source of truth
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		for range ticker.C {
-			broadcastOrderBook(ex)
+			broadcastOrderBook(ex, database)
 		}
 	}()
 

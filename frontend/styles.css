@@ -106,7 +106,8 @@ button:hover {
     border-radius: 8px;
     padding: 15px;
     border: 1px solid var(--border-color);
-    min-height: 300px;
+    height: 500px;
+    overflow-y: auto;
 }
 
 #orderbook {
@@ -136,6 +137,7 @@ button:hover {
     border-radius: 8px;
     padding: 15px;
     border: 1px solid var(--border-color);
+    height: 200px;
 }
 
 .order-form-area h3 {
@@ -152,6 +154,8 @@ button:hover {
     border-radius: 8px;
     padding: 15px;
     border: 1px solid var(--border-color);
+    height: 200px;
+    overflow-y: auto;
 }
 
 .orders-area h3 {
