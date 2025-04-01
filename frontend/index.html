@@ -21,27 +21,64 @@
 
         <!-- Trading Section (hidden until logged in) -->
         <div id="trading-section" class="section hidden">
-            <!-- Chart Container -->
-            <div id="chart-container">
-                <div id="chart"></div>
+            <div class="trading-grid">
+                <!-- Left Column: Chart -->
+                <div id="chart-container" class="chart-area">
+                    <h3>BTC/USD</h3>
+                    <div id="chart"></div>
+                </div>
+
+                <!-- Right Column: Order Book and Order Form -->
+                <div class="right-column">
+                    <!-- Order Book -->
+                    <div id="orderbook-container" class="order-book-area">
+                        <h3>Order Book</h3>
+                        <div id="orderbook">
+                            <div class="orderbook-half">
+                                <h4>Asks</h4>
+                                <table id="asks-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Price</th>
+                                            <th>Size</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="asks-body"></tbody>
+                                </table>
+                            </div>
+                            <div class="orderbook-half">
+                                <h4>Bids</h4>
+                                <table id="bids-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Price</th>
+                                            <th>Size</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="bids-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Order Form -->
+                    <div id="order-form-container" class="order-form-area">
+                        <h3>Place Order</h3>
+                        <form id="order-form">
+                            <select id="order-type" required>
+                                <option value="buy">Buy</option>
+                                <option value="sell">Sell</option>
+                            </select>
+                            <input type="number" id="price" placeholder="Price" step="0.01" required>
+                            <input type="number" id="quantity" placeholder="Quantity" step="0.001" required>
+                            <button type="submit" id="place-order-btn">Place Order</button>
+                        </form>
+                    </div>
+                </div>
             </div>
 
-            <!-- Order Form -->
-            <div id="order-form-container">
-                <h3>Place Order</h3>
-                <form id="order-form">
-                    <select id="order-type" required>
-                        <option value="buy">Buy</option>
-                        <option value="sell">Sell</option>
-                    </select>
-                    <input type="number" id="price" placeholder="Price" step="0.01" required>
-                    <input type="number" id="quantity" placeholder="Quantity" step="0.001" required>
-                    <button type="submit">Place Order</button>
-                </form>
-            </div>
-
-            <!-- Orders Table -->
-            <div id="orders-container">
+            <!-- Orders Table (Bottom) -->
+            <div id="orders-container" class="orders-area">
                 <h3>Your Orders</h3>
                 <table id="orders-table">
                     <thead>
