@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"time"
 
@@ -64,92 +65,59 @@ func main() {
 		}
 	}
 
-	// Create buy orders for user1
-	var buyOrder1, buyOrder2, buyOrder3 int
-	err = database.Pool.QueryRow(ctx,
-		"INSERT INTO orders (user_id, type, price, quantity, status, created_at) VALUES ($1, 'buy', 30000, 0.1, 'filled', NOW() - INTERVAL '3 day') RETURNING id",
-		user1ID).Scan(&buyOrder1)
-	if err != nil {
-		log.Fatalf("Failed to create buy order 1: %v", err)
-	}
+	// Generate trades over the last hour with 1-minute intervals
+	baseTime := time.Now().Add(-1 * time.Hour)
+	basePrice := 800.0     // Starting price around 800
+	priceVolatility := 5.0 // Max price movement per minute (±$5)
 
-	err = database.Pool.QueryRow(ctx,
-		"INSERT INTO orders (user_id, type, price, quantity, status, created_at) VALUES ($1, 'buy', 31000, 0.2, 'filled', NOW() - INTERVAL '2 day') RETURNING id",
-		user1ID).Scan(&buyOrder2)
-	if err != nil {
-		log.Fatalf("Failed to create buy order 2: %v", err)
-	}
+	for i := 0; i < 60; i++ { // One hour of data
+		tradeTime := baseTime.Add(time.Duration(i) * time.Minute)
 
-	err = database.Pool.QueryRow(ctx,
-		"INSERT INTO orders (user_id, type, price, quantity, status, created_at) VALUES ($1, 'buy', 32000, 0.15, 'filled', NOW() - INTERVAL '1 day') RETURNING id",
-		user1ID).Scan(&buyOrder3)
-	if err != nil {
-		log.Fatalf("Failed to create buy order 3: %v", err)
-	}
+		// Calculate price movement for this minute
+		priceChange := (rand.Float64()*2 - 1) * priceVolatility
+		currentPrice := basePrice + priceChange
 
-	// Create sell orders for user2
-	var sellOrder1, sellOrder2, sellOrder3 int
-	err = database.Pool.QueryRow(ctx,
-		"INSERT INTO orders (user_id, type, price, quantity, status, created_at) VALUES ($1, 'sell', 30000, 0.1, 'filled', NOW() - INTERVAL '3 day') RETURNING id",
-		user2ID).Scan(&sellOrder1)
-	if err != nil {
-		log.Fatalf("Failed to create sell order 1: %v", err)
-	}
+		// Create 2-5 trades per minute
+		numTrades := rand.Intn(4) + 2
+		for j := 0; j < numTrades; j++ {
+			// Add small price variation within the minute
+			tradePrice := currentPrice + (rand.Float64()*2-1)*0.5 // ±$0.50 variation
+			quantity := 0.1 + rand.Float64()*0.9                  // Random quantity between 0.1 and 1.0 BTC
 
-	err = database.Pool.QueryRow(ctx,
-		"INSERT INTO orders (user_id, type, price, quantity, status, created_at) VALUES ($1, 'sell', 31000, 0.2, 'filled', NOW() - INTERVAL '2 day') RETURNING id",
-		user2ID).Scan(&sellOrder2)
-	if err != nil {
-		log.Fatalf("Failed to create sell order 2: %v", err)
-	}
+			// Create buy order
+			var buyOrderID int
+			err = database.Pool.QueryRow(ctx,
+				"INSERT INTO orders (user_id, type, price, quantity, status, created_at) VALUES ($1, 'buy', $2, $3, 'filled', $4) RETURNING id",
+				user1ID, tradePrice, quantity, tradeTime).Scan(&buyOrderID)
+			if err != nil {
+				log.Fatalf("Failed to create buy order: %v", err)
+			}
 
-	err = database.Pool.QueryRow(ctx,
-		"INSERT INTO orders (user_id, type, price, quantity, status, created_at) VALUES ($1, 'sell', 32000, 0.15, 'filled', NOW() - INTERVAL '1 day') RETURNING id",
-		user2ID).Scan(&sellOrder3)
-	if err != nil {
-		log.Fatalf("Failed to create sell order 3: %v", err)
-	}
+			// Create sell order
+			var sellOrderID int
+			err = database.Pool.QueryRow(ctx,
+				"INSERT INTO orders (user_id, type, price, quantity, status, created_at) VALUES ($1, 'sell', $2, $3, 'filled', $4) RETURNING id",
+				user2ID, tradePrice, quantity, tradeTime).Scan(&sellOrderID)
+			if err != nil {
+				log.Fatalf("Failed to create sell order: %v", err)
+			}
 
-	// Create trades between the orders
-	baseTime := time.Now().Add(-3 * 24 * time.Hour) // 3 days ago
+			// Create trade
+			trade := models.Trade{
+				BuyOrderID:  buyOrderID,
+				SellOrderID: sellOrderID,
+				Price:       tradePrice,
+				Quantity:    quantity,
+				ExecutedAt:  tradeTime,
+			}
+			_, err = database.CreateTrade(ctx, &trade)
+			if err != nil {
+				log.Fatalf("Failed to create trade: %v", err)
+			}
+		}
 
-	// Create trade 1 (3 days ago)
-	trade1 := models.Trade{
-		BuyOrderID:  buyOrder1,
-		SellOrderID: sellOrder1,
-		Price:       30000,
-		Quantity:    0.1,
-		ExecutedAt:  baseTime,
-	}
-	_, err = database.CreateTrade(ctx, &trade1)
-	if err != nil {
-		log.Fatalf("Failed to create trade 1: %v", err)
-	}
-
-	// Create trade 2 (2 days ago)
-	trade2 := models.Trade{
-		BuyOrderID:  buyOrder2,
-		SellOrderID: sellOrder2,
-		Price:       31000,
-		Quantity:    0.2,
-		ExecutedAt:  baseTime.Add(24 * time.Hour),
-	}
-	_, err = database.CreateTrade(ctx, &trade2)
-	if err != nil {
-		log.Fatalf("Failed to create trade 2: %v", err)
-	}
-
-	// Create trade 3 (1 day ago)
-	trade3 := models.Trade{
-		BuyOrderID:  buyOrder3,
-		SellOrderID: sellOrder3,
-		Price:       32000,
-		Quantity:    0.15,
-		ExecutedAt:  baseTime.Add(48 * time.Hour),
-	}
-	_, err = database.CreateTrade(ctx, &trade3)
-	if err != nil {
-		log.Fatalf("Failed to create trade 3: %v", err)
+		// Update base price for next minute
+		basePrice += priceChange * 0.5 // Trend continuation
 	}
 
 	fmt.Println("Successfully seeded the database with test trades!")
