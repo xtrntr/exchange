@@ -23,10 +23,10 @@ type Order struct {
 
 // Trade represents an executed trade
 type Trade struct {
-	ID           int
-	BuyOrderID   int
-	SellOrderID  int
-	Price        float64
-	Quantity     float64
-	ExecutedAt   time.Time
-} 
+	ID          int       `json:"id"`
+	BuyOrderID  int       `json:"buy_order_id"`
+	SellOrderID int       `json:"sell_order_id"`
+	Price       float64   `json:"price"`
+	Quantity    float64   `json:"quantity"`
+	ExecutedAt  time.Time `json:"executed_at"`
+}

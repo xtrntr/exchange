@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -167,7 +168,7 @@ func main() {
 
 	// Enable CORS
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"http://localhost:5173"}, // Only allow the React dev server
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		ExposedHeaders:   []string{"Link"},
@@ -175,15 +176,12 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	// Serve static files
-	r.Handle("/*", http.FileServer(http.Dir("frontend")))
-
 	// WebSocket endpoint
 	r.Get("/ws", handleWebSocket(ex, database))
 
 	// Public endpoints
-	r.Post("/auth/register", handler.Register)
-	r.Post("/auth/login", handler.Login)
+	r.Post("/register", handler.Register)
+	r.Post("/login", handler.Login)
 
 	// Protected endpoints (require JWT)
 	r.Group(func(r chi.Router) {
@@ -193,6 +191,19 @@ func main() {
 		r.Delete("/orders/{id}", handler.CancelOrder)
 		r.Get("/orderbook", handler.GetOrderBook)
 		r.Get("/trades", handler.GetUserTrades)
+		r.Get("/trades/all", handler.GetAllTrades)
+		r.Get("/debug/auth", func(w http.ResponseWriter, r *http.Request) {
+			userID, ok := r.Context().Value("user_id").(int)
+			if !ok {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			response := fmt.Sprintf(`{"status":"success","user_id":%d,"authenticated":true}`, userID)
+			w.Write([]byte(response))
+		})
 	})
 
 	// Start periodic order book broadcast using database as source of truth
@@ -204,7 +215,7 @@ func main() {
 	}()
 
 	// Start server
-	log.Println("Starting server on :8080")
+	log.Printf("Starting server on :8080")
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}

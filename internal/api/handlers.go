@@ -291,3 +291,22 @@ func (h *Handler) CancelOrder(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Order canceled"})
 }
+
+// GetAllTrades retrieves all trades in the system
+func (h *Handler) GetAllTrades(w http.ResponseWriter, r *http.Request) {
+	// Authentication is still required, but we'll return all trades regardless of user
+	_, ok := r.Context().Value("user_id").(int)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	// Get all trades from database
+	trades, err := h.DB.GetAllTrades(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to retrieve trades")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, trades)
+}

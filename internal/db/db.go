@@ -233,3 +233,28 @@ func (db *DB) GetOpenOrders(ctx context.Context) ([]models.Order, error) {
 
 	return orders, nil
 }
+
+// GetAllTrades retrieves all trades from the database
+func (db *DB) GetAllTrades(ctx context.Context) ([]models.Trade, error) {
+	rows, err := db.Pool.Query(ctx,
+		"SELECT id, buy_order_id, sell_order_id, price, quantity, executed_at FROM trades ORDER BY executed_at DESC")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all trades: %w", err)
+	}
+	defer rows.Close()
+
+	var trades []models.Trade
+	for rows.Next() {
+		var trade models.Trade
+		if err := rows.Scan(&trade.ID, &trade.BuyOrderID, &trade.SellOrderID, &trade.Price, &trade.Quantity, &trade.ExecutedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan trade: %w", err)
+		}
+		trades = append(trades, trade)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating trades rows: %w", err)
+	}
+
+	return trades, nil
+}
